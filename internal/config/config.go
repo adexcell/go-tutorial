@@ -7,9 +7,9 @@ type Config struct {
 }
 
 func Load() *Config {
-	viper.SetConfigFile(".env")
-	viper.ReadInConfig()
+	viper.SetConfigFile(".env")	// путь к .env файлу
+	viper.ReadInConfig()	// чтение переменных окружения
 	cfg := &Config{}
-	viper.Unmarshal(cfg)
+	viper.Unmarshal(cfg)	// парсинг в структуру
 	return cfg
 }

@@ -18,14 +18,17 @@ func main() {
 	log := logger.NewLogger()
 	cfg := config.Load()
 
+	// Gin роутер
 	r := gin.Default()
 	r.GET("/health", handler.Health)
 
+	// Сервер
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: r,
 	}
 
+	// Запуск сервера в горутине
 	go func() {
 		log.Info().Msgf("Server starting on port %s", cfg.Port)
 		srv.ListenAndServe()
@@ -37,6 +40,7 @@ func main() {
 	<-quit
 	log.Info().Msgf("Shutdown signal received")
 
+	// 30 сек на завершение запросов
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
