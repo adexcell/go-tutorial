@@ -1,0 +1,15 @@
+services:
+  pg:
+    image: postgres:17-alpine
+    container_name: delayed_pg
+    restart: always
+    shm_size: 128mb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: delayed_notifier
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+
