@@ -10,7 +10,9 @@ import (
 	"syscall"
 
 	"github.com/adexcell/go-tutorial/internal/config"
+	"github.com/adexcell/go-tutorial/internal/handler"
 	"github.com/adexcell/go-tutorial/internal/repository/postgres"
+	"github.com/adexcell/go-tutorial/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
@@ -37,7 +39,13 @@ func (a *App) Run(ctx context.Context) error {
 
 	a.storage = storage
 
+	userRepo := postgres.NewUserRepository(storage)
+	userService := service.NewUserService(userRepo)
+	userHandler := handler.NewUserHandler(userService)
+
 	router := gin.Default()
+	router.POST("/auth/register", userHandler.Register)
+	
 	srv := &http.Server{
 		Addr:           a.cfg.HTTPServer.Addr,
 		Handler:        router,
