@@ -43,9 +43,11 @@ func (a *App) Run(ctx context.Context) error {
 	userService := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userService)
 
-	router := gin.Default()
+	router := gin.New()
+	router.Use(handler.Logger(a.logger))
+	router.Use(gin.Recovery())
 	router.POST("/auth/register", userHandler.Register)
-	
+
 	srv := &http.Server{
 		Addr:           a.cfg.HTTPServer.Addr,
 		Handler:        router,
