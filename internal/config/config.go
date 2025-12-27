@@ -5,13 +5,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	_ "github.com/go-playground/validator/v10"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
 	Env        string           `mapstructure:"env" validate:"required"`
 	HTTPServer HTTPServerConfig `mapstructure:"http_server" validate:"required"`
+	Auth       AuthConfig       `mapstructure:"auth" validate:"required"`
 	Gin        GinConfig        `mapstructure:"gin" validate:"required"`
 	Postgres   PostgresConfig   `mapstructure:"postgres" validate:"required"`
 	Redis      RedisConfig      `mapstructure:"redis" validate:"required"`
@@ -27,6 +28,11 @@ type HTTPServerConfig struct {
 	IdleTimeout     time.Duration `mapstructure:"idle_timeout" validate:"required"`
 	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout" validate:"required"`
 	MaxHeaderBytes  int           `mapstructure:"max_header_bytes" validate:"required"`
+}
+
+type AuthConfig struct {
+	JWTSecret string        `mapstructure:"jwt_secret" validate:"required"`
+	TokenTTL  time.Duration `mapstructure:"token_ttl" validate:"required"`
 }
 
 type GinConfig struct {

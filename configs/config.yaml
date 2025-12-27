@@ -8,6 +8,10 @@ http_server:
   shutdown_timeout: "15s"     # Graceful Shutdown timer
   max_header_bytes: 1048576   # 1MB. Защита от Dos-атак через гигантские HTTP-заголовки.
 
+auth:
+  jwt_secret: "super-secret-key-change-me-in-prod"
+  token_ttl: "72h"
+
 gin:
   # debag (логирует каждый запрос), release (макс. производительность)
   mode: "debug"               # local -> debug, prod -> release
