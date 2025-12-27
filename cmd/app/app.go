@@ -11,12 +11,14 @@ import (
 
 	"github.com/adexcell/go-tutorial/internal/config"
 	"github.com/adexcell/go-tutorial/internal/handler"
-	"github.com/adexcell/go-tutorial/internal/repository/postgres"
 	"github.com/adexcell/go-tutorial/internal/repository/cache"
+	"github.com/adexcell/go-tutorial/internal/repository/postgres"
+	"github.com/adexcell/go-tutorial/internal/repository/queue"
 	"github.com/adexcell/go-tutorial/internal/service"
 	"github.com/adexcell/go-tutorial/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 )
@@ -26,6 +28,7 @@ type App struct {
 	logger  zerolog.Logger
 	storage *pgxpool.Pool
 	cache   *redis.Client
+	queue    *amqp.Connection
 }
 
 func New(cfg *config.Config, logger zerolog.Logger) *App {
@@ -50,6 +53,12 @@ func (a *App) Run(ctx context.Context) error {
 		return fmt.Errorf("не удалось запустить redis: %v", err)
 	}
 	a.cache = redisCache
+
+	rabbitQueue, err := queue.New(a.cfg.RabbitMQ.URL)
+	if err != nil {
+		return fmt.Errorf("не удалось запустить rabbitmq: %v", err)
+	}
+	a.queue = rabbitQueue
 
 	userRepo := postgres.NewUserRepository(a.storage)
 	userCache := cache.NewUserCache(a.cache)
@@ -113,6 +122,9 @@ func (a *App) Run(ctx context.Context) error {
 
 	a.storage.Close()
 	a.logger.Info().Msg("Storage down")
+
+	a.queue.Close()
+	a.logger.Info().Msg("RabbitMQ down")
 
 	return nil
 }
