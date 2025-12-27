@@ -13,8 +13,9 @@ import (
 	"github.com/adexcell/go-tutorial/internal/handler"
 	"github.com/adexcell/go-tutorial/internal/repository/cache"
 	"github.com/adexcell/go-tutorial/internal/repository/postgres"
-	"github.com/adexcell/go-tutorial/internal/repository/queue"
+	"github.com/adexcell/go-tutorial/internal/repository/rabbitmq"
 	"github.com/adexcell/go-tutorial/internal/service"
+	"github.com/adexcell/go-tutorial/internal/worker"
 	"github.com/adexcell/go-tutorial/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,7 +29,7 @@ type App struct {
 	logger  zerolog.Logger
 	storage *pgxpool.Pool
 	cache   *redis.Client
-	queue    *amqp.Connection
+	conn    *amqp.Connection
 }
 
 func New(cfg *config.Config, logger zerolog.Logger) *App {
@@ -54,11 +55,12 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	a.cache = redisCache
 
-	rabbitQueue, err := queue.New(a.cfg.RabbitMQ.URL)
+	conn, err := rabbitmq.New(a.cfg.RabbitMQ.URL)
 	if err != nil {
 		return fmt.Errorf("не удалось запустить rabbitmq: %v", err)
 	}
-	a.queue = rabbitQueue
+	a.conn = conn
+
 
 	userRepo := postgres.NewUserRepository(a.storage)
 	userCache := cache.NewUserCache(a.cache)
@@ -77,6 +79,12 @@ func (a *App) Run(ctx context.Context) error {
 	)
 	userHandler := handler.NewUserHandler(userService)
 
+	notificationQueue := rabbitmq.NewNotificationQueue(a.conn)
+	notificationService := service.NewNotificationService(notificationQueue)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
+
+	authMiddleware := handler.Auth(manager)
+
 	router := gin.New()
 	// middleware
 	router.Use(handler.Logger(a.logger))
@@ -89,6 +97,13 @@ func (a *App) Run(ctx context.Context) error {
 	// routs
 	router.POST("/auth/register", userHandler.Register)
 	router.POST("/auth/login", userHandler.Login)
+
+	//routs for notifications with middleware
+	protected := router.Group("/api")
+	protected.Use(authMiddleware)
+	{
+		protected.POST("/notification", notificationHandler.Schedule)
+	}
 
 	srv := &http.Server{
 		Addr:           a.cfg.HTTPServer.Addr,
@@ -108,6 +123,13 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}()
 
+	msgs, err := notificationQueue.Consume(ctx)
+	if err != nil {
+		return fmt.Errorf("ошибка создания очереди сообщений: %w", err)
+	}
+
+	go worker.Start(ctx, msgs, a.logger)
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
@@ -123,7 +145,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.storage.Close()
 	a.logger.Info().Msg("Storage down")
 
-	a.queue.Close()
+	a.conn.Close()
 	a.logger.Info().Msg("RabbitMQ down")
 
 	return nil
